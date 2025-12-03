@@ -1,0 +1,33 @@
+/* Custom CSS for precise positioning of game elements */
+
+.game-page-container {
+  /* Container for the game page */
+}
+
+.asen-character {
+  /* Asen positioned at bottom left */
+  bottom: 0;
+  left: 0;
+  /* Adjust size as needed */
+  width: auto;
+  height: auto;
+  z-index: 10;
+}
+
+.peevski-character {
+  /* Peevski positioned at exact point near parliament doors */
+  left: 50.62%;
+  top: 53.80%;
+  transform: translate(-50%, -50%);
+  height: 150px; /* Adjust size as needed */
+  width: auto;
+  z-index: 10;
+}
+
+.rope-element {
+  /* Rope connecting asen to peevski */
+  /* TODO: Position and rotate rope to connect the two characters */
+  /* This will likely require transform: rotate() and precise positioning */
+  z-index: 5;
+}
+
