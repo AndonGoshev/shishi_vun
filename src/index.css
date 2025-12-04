@@ -1,8 +1,8 @@
+@import './custom-styles.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-@import './custom-styles.css';
 
 @layer base {
   * {

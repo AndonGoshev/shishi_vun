@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
+import { Stage, Layer, Line } from 'react-konva'
+import useImage from 'use-image'
 import parliamentBg from '../assets/images/parliament-bg.png'
 import asen from '../assets/images/asen.png'
 import peevski from '../assets/images/peevski.png'
@@ -9,55 +11,48 @@ function GamePage() {
   const [clickPosition, setClickPosition] = useState(null)
   const [debugMode, setDebugMode] = useState(true)
   const containerRef = useRef(null)
-  const [ropeStyle, setRopeStyle] = useState({})
   const [ropeStart, setRopeStart] = useState({ x: 35.17, y: 75.07 })
-  const [ropeEnd, setRopeEnd] = useState({ x: 48.49, y: 55.00 })
+  const [ropeEnd, setRopeEnd] = useState({ x: 48.49, y: 55.0 })
   const [ropeEditMode, setRopeEditMode] = useState(true)
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 })
+  const [ropeImage] = useImage(rope)
+  const ropeStrokeColor = '#c49a6c'
 
-  // Calculate rope position, angle, and length
+  // Calculate container size and rope segments
   useEffect(() => {
-    const calculateRope = () => {
+    const updateSize = () => {
       if (!containerRef.current) return
-
       const container = containerRef.current
-      const containerWidth = container.offsetWidth
-      const containerHeight = container.offsetHeight
-
-      // Start point
-      const startX = (ropeStart.x / 100) * containerWidth
-      const startY = (ropeStart.y / 100) * containerHeight
-
-      // End point
-      const endX = (ropeEnd.x / 100) * containerWidth
-      const endY = (ropeEnd.y / 100) * containerHeight
-
-      // Calculate distance
-      const deltaX = endX - startX
-      const deltaY = endY - startY
-      const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY)
-
-      // Calculate angle in degrees
-      const angle = Math.atan2(deltaY, deltaX) * (180 / Math.PI)
-
-      setRopeStyle({
-        left: `${ropeStart.x}%`,
-        top: `${ropeStart.y}%`,
-        transform: `translate(-50%, -50%) rotate(${angle}deg)`,
-        width: `${distance}px`,
-        height: '40px', // Increased height for visibility
-        backgroundImage: `url(${rope})`,
-        backgroundRepeat: 'repeat-x',
-        backgroundSize: 'auto 100%',
-        backgroundPosition: 'center',
-        transformOrigin: 'left center',
+      setContainerSize({
+        width: container.offsetWidth,
+        height: container.offsetHeight
       })
     }
 
-    calculateRope()
-    window.addEventListener('resize', calculateRope)
-    
-    return () => window.removeEventListener('resize', calculateRope)
-  }, [ropeStart, ropeEnd])
+    updateSize()
+    window.addEventListener('resize', updateSize)
+    return () => window.removeEventListener('resize', updateSize)
+  }, [])
+
+  // Calculate rope line points for Konva
+  const ropePoints = (() => {
+    if (!containerSize.width || !containerSize.height) {
+      return []
+    }
+
+    const startX = (ropeStart.x / 100) * containerSize.width
+    const startY = (ropeStart.y / 100) * containerSize.height
+    const endX = (ropeEnd.x / 100) * containerSize.width
+    const endY = (ropeEnd.y / 100) * containerSize.height
+
+    return [startX, startY, endX, endY]
+  })()
+
+  const desiredRopeThickness = 6
+  const ropeStrokeWidth = desiredRopeThickness
+  const ropePatternScale = ropeImage && ropeImage.height
+    ? desiredRopeThickness / ropeImage.height
+    : 0.25
 
   const handleContainerClick = (e) => {
     if (!debugMode) return
@@ -219,11 +214,31 @@ function GamePage() {
         className="absolute bottom-0 left-[-5%] asen-character w-1/2 h-1/2"
       />
       
-      {/* Rope connecting asen to peevski */}
-      <div 
-        className="absolute rope-element"
-        style={ropeStyle}
-      />
+      {/* Rope connecting asen to peevski using Konva */}
+      {containerSize.width > 0 && containerSize.height > 0 && ropePoints.length === 4 && (
+        <Stage
+          width={containerSize.width}
+          height={containerSize.height}
+          className="absolute top-0 left-0 pointer-events-none"
+          style={{ zIndex: 6 }}
+          listening={false}
+        >
+          <Layer>
+            <Line
+              points={ropePoints}
+              stroke={ropeStrokeColor}
+              strokeWidth={ropeStrokeWidth}
+              lineCap="round"
+              lineJoin="round"
+              strokePatternImage={ropeImage || undefined}
+              strokePatternRepeat="repeat"
+              strokePatternRotation={45}
+              strokePatternScaleX={ropePatternScale}
+              strokePatternScaleY={ropePatternScale}
+            />
+          </Layer>
+        </Stage>
+      )}
       
       {/* Peevski at parliament doors */}
       <img 
