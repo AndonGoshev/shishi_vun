@@ -5,6 +5,9 @@ import parliamentBg from '../assets/images/parliament-bg.png'
 import asen from '../assets/images/asen.png'
 import peevski from '../assets/images/peevski.png'
 import rope from '../assets/images/rope-texture.png'
+import pullSound1Url from '../assets/audio/pull1.wav'
+import pullSound2Url from '../assets/audio/pull2.wav'
+import pullSound3Url from '../assets/audio/pull3.wav'
 import './GamePage.css'
 
 const TOTAL_PULLS = 100
@@ -44,6 +47,9 @@ function GamePage() {
     rope: { x: 0, y: 0 },
   })
   const shakeTimeoutRef = useRef(null)
+  const pullSound1Ref = useRef(null)
+  const pullSound2Ref = useRef(null)
+  const pullSound3Ref = useRef(null)
 
   useEffect(() => {
     const updateSize = () => {
@@ -65,6 +71,29 @@ function GamePage() {
       if (shakeTimeoutRef.current) {
         clearTimeout(shakeTimeoutRef.current)
       }
+    }
+  }, [])
+
+  useEffect(() => {
+    const pullAudio1 = new Audio(pullSound1Url)
+    pullAudio1.volume = 0.25
+    pullSound1Ref.current = pullAudio1
+
+    const pullAudio2 = new Audio(pullSound2Url)
+    pullAudio2.volume = 0.3
+    pullSound2Ref.current = pullAudio2
+
+    const pullAudio3 = new Audio(pullSound3Url)
+    pullAudio3.volume = 0.35
+    pullSound3Ref.current = pullAudio3
+
+    return () => {
+      pullAudio1.pause()
+      pullSound1Ref.current = null
+      pullAudio2.pause()
+      pullSound2Ref.current = null
+      pullAudio3.pause()
+      pullSound3Ref.current = null
     }
   }, [])
 
@@ -303,6 +332,23 @@ function GamePage() {
     setPullCount(nextCount)
     setRopeEnd(newRopeEnd)
     setPeevskiHeight(newPeevskiHeight)
+    const isTwentiethPull = nextCount % 20 === 0
+    const isHundredthPull = nextCount === TOTAL_PULLS
+    const isFifthPull = nextCount % 5 === 0
+
+    let pullAudio = pullSound1Ref.current
+    if (isHundredthPull || isTwentiethPull) {
+      pullAudio = pullSound3Ref.current
+    } else if (isFifthPull) {
+      pullAudio = pullSound2Ref.current
+    }
+
+    if (pullAudio) {
+      pullAudio.currentTime = 0
+      pullAudio.play().catch((err) => {
+        console.warn('Pull sound blocked', err)
+      })
+    }
     triggerShake()
   }
 
