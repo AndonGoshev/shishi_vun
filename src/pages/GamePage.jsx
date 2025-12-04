@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Stage, Layer, Line, Image as KonvaImage } from 'react-konva'
 import useImage from 'use-image'
+import confetti from 'canvas-confetti'
 import parliamentBg from '../assets/images/parliament-bg.png'
 import asen from '../assets/images/asen.png'
 import peevski from '../assets/images/peevski.png'
@@ -11,6 +12,7 @@ import protest2 from '../assets/images/protest1.png'
 import pullSound1Url from '../assets/audio/pull1.wav'
 import pullSound2Url from '../assets/audio/pull2.wav'
 import pullSound3Url from '../assets/audio/pull3.wav'
+import applauseUrl from '../assets/audio/applause.mp3'
 import pullVideoStage1Url from '../assets/video/Pull-Special1.mp4'
 import pullVideoStage2Url from '../assets/video/pull-special2.mp4'
 import pullVideoStage3Url from '../assets/video/pull-special3.mp4'
@@ -18,13 +20,11 @@ import pullVideoStage4Url from '../assets/video/pull-special4.mp4'
 import pullVideoStage5Url from '../assets/video/pull-special5.mp4'
 import './GamePage.css'
 
-const TOTAL_PULLS = 50
+const TOTAL_PULLS = 30
 const HIGHLIGHT_VIDEOS = {
   10: pullVideoStage1Url,
-  20: pullVideoStage2Url,
-  30: pullVideoStage3Url,
-  40: pullVideoStage4Url,
-  50: pullVideoStage5Url,
+  20: pullVideoStage4Url,
+  30: pullVideoStage5Url,
 }
 const PEEVSKI_CLICK_OPACITY = [0, 0.33, 0.66, 0.66, 1]
 const INITIAL_ROPE_START = { x: 35.17, y: 98.07 }
@@ -43,7 +43,7 @@ const PEEVSKI_SHAKE_STRENGTH = 2
 const LOADER_MIN_DURATION = 2000
 const PULL_TO_REFRESH_THRESHOLD = 80
 
-function GamePage() {
+function GamePage({ isMuted, onToggleMute, onStopBackgroundMusic }) {
   const navigate = useNavigate()
   const [clickPosition, setClickPosition] = useState(null)
   const [debugMode, setDebugMode] = useState(true)
@@ -68,9 +68,13 @@ function GamePage() {
   const pullSound1Ref = useRef(null)
   const pullSound2Ref = useRef(null)
   const pullSound3Ref = useRef(null)
+  const applauseRef = useRef(null)
   const pullStartYRef = useRef(null)
   const pullTriggeredRef = useRef(false)
   const pullVideoRef = useRef(null)
+  const video1Ref = useRef(null)
+  const video4Ref = useRef(null)
+  const video5Ref = useRef(null)
   const [isVideoPlaying, setIsVideoPlaying] = useState(false)
   const [showPullVideo, setShowPullVideo] = useState(false)
   const [pullVideoVisible, setPullVideoVisible] = useState(false)
@@ -119,19 +123,146 @@ function GamePage() {
     pullAudio3.volume = 0.35
     pullSound3Ref.current = pullAudio3
 
+    const applauseAudio = new Audio(applauseUrl)
+    applauseAudio.volume = 0.7
+    applauseAudio.loop = false
+    applauseRef.current = applauseAudio
+
+    // Handle page visibility changes - pause all audio/video when tab is hidden
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        // Pause all pull sounds
+        if (pullSound1Ref.current) {
+          pullSound1Ref.current.pause()
+          pullSound1Ref.current.currentTime = 0
+        }
+        if (pullSound2Ref.current) {
+          pullSound2Ref.current.pause()
+          pullSound2Ref.current.currentTime = 0
+        }
+        if (pullSound3Ref.current) {
+          pullSound3Ref.current.pause()
+          pullSound3Ref.current.currentTime = 0
+        }
+        if (applauseRef.current) {
+          applauseRef.current.pause()
+          applauseRef.current.currentTime = 0
+        }
+        // Pause videos
+        if (pullVideoRef.current) {
+          pullVideoRef.current.pause()
+        }
+        if (video1Ref.current) {
+          video1Ref.current.pause()
+        }
+        if (video4Ref.current) {
+          video4Ref.current.pause()
+        }
+        if (video5Ref.current) {
+          video5Ref.current.pause()
+        }
+      }
+    }
+
+    // Handle browser close/refresh
+    const handleBeforeUnload = () => {
+      if (pullSound1Ref.current) {
+        pullSound1Ref.current.pause()
+        pullSound1Ref.current.currentTime = 0
+      }
+      if (pullSound2Ref.current) {
+        pullSound2Ref.current.pause()
+        pullSound2Ref.current.currentTime = 0
+      }
+      if (pullSound3Ref.current) {
+        pullSound3Ref.current.pause()
+        pullSound3Ref.current.currentTime = 0
+      }
+      if (applauseRef.current) {
+        applauseRef.current.pause()
+        applauseRef.current.currentTime = 0
+      }
+      if (pullVideoRef.current) {
+        pullVideoRef.current.pause()
+        pullVideoRef.current.currentTime = 0
+      }
+      if (video1Ref.current) {
+        video1Ref.current.pause()
+        video1Ref.current.currentTime = 0
+      }
+      if (video4Ref.current) {
+        video4Ref.current.pause()
+        video4Ref.current.currentTime = 0
+      }
+      if (video5Ref.current) {
+        video5Ref.current.pause()
+        video5Ref.current.currentTime = 0
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    window.addEventListener('unload', handleBeforeUnload)
+    window.addEventListener('pagehide', handleBeforeUnload)
+
     return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+      window.removeEventListener('unload', handleBeforeUnload)
+      window.removeEventListener('pagehide', handleBeforeUnload)
+      
       pullAudio1.pause()
       pullSound1Ref.current = null
       pullAudio2.pause()
       pullSound2Ref.current = null
       pullAudio3.pause()
       pullSound3Ref.current = null
+      if (applauseRef.current) {
+        applauseRef.current.pause()
+        applauseRef.current = null
+      }
       if (pullVideoRef.current) {
         pullVideoRef.current.pause()
         pullVideoRef.current.currentTime = 0
       }
+      if (video1Ref.current) {
+        video1Ref.current.pause()
+        video1Ref.current.currentTime = 0
+      }
+      if (video4Ref.current) {
+        video4Ref.current.pause()
+        video4Ref.current.currentTime = 0
+      }
+      if (video5Ref.current) {
+        video5Ref.current.pause()
+        video5Ref.current.currentTime = 0
+      }
     }
   }, [])
+
+  // Preload videos when component mounts
+  useEffect(() => {
+    // Force load all videos to preload them
+    const preloadVideos = () => {
+      if (video1Ref.current) {
+        video1Ref.current.load()
+      }
+      if (video4Ref.current) {
+        video4Ref.current.load()
+      }
+      if (video5Ref.current) {
+        video5Ref.current.load()
+      }
+    }
+    
+    // Preload immediately
+    preloadVideos()
+    
+    // Also preload after assets are loaded
+    if (assetsLoaded) {
+      setTimeout(preloadVideos, 100)
+    }
+  }, [assetsLoaded])
 
   useEffect(() => {
     let isMounted = true
@@ -353,6 +484,7 @@ function GamePage() {
 
   const playPullHighlightVideo = (videoUrl) => {
     if (!videoUrl) return
+    
     setCurrentPullVideoUrl(videoUrl)
     setShowPullVideo(true)
     setIsVideoPlaying(true)
@@ -361,6 +493,7 @@ function GamePage() {
       setTimeout(() => {
         const video = pullVideoRef.current
         if (video) {
+          video.volume = 0.7
           video.currentTime = 0
           const playPromise = video.play()
           if (playPromise !== undefined) {
@@ -385,11 +518,49 @@ function GamePage() {
       setShowPullVideo(false)
       setCurrentPullVideoUrl(null)
       if (pullCount >= TOTAL_PULLS) {
+        // Stop background music and play applause after final video
+        if (onStopBackgroundMusic) {
+          onStopBackgroundMusic()
+        }
+        if (applauseRef.current) {
+          applauseRef.current.currentTime = 0
+          const playPromise = applauseRef.current.play()
+          if (playPromise !== undefined) {
+            playPromise.catch((err) => {
+              console.warn('Applause playback blocked', err)
+            })
+          }
+        }
         setGameCompleted(true)
         setShowVictoryModal(true)
       }
     }, 300)
   }
+
+  // Trigger confetti when victory modal shows
+  useEffect(() => {
+    if (showVictoryModal) {
+      const colors = ['#8B0000', '#FFD700', '#FF6B6B', '#4ECDC4']
+
+      // Single initial burst from center
+      confetti({
+        particleCount: 500,
+        spread: 160,
+        origin: { x: 0.5, y: 0.5 },
+        colors: colors,
+      })
+
+      // One more smaller burst after a delay
+      setTimeout(() => {
+        confetti({
+          particleCount: 30,
+          spread: 50,
+          origin: { x: 0.5, y: 0.5 },
+          colors: colors,
+        })
+      }, 1500)
+    }
+  }, [showVictoryModal])
 
   const handlePull = () => {
     if (isVideoPlaying) return
@@ -529,6 +700,43 @@ function GamePage() {
         >
           <path d="M15 18l-6-6 6-6" />
         </svg>
+      </button>
+      <button
+        type="button"
+        onClick={onToggleMute}
+        aria-label={isMuted ? "Unmute audio" : "Mute audio"}
+        className="absolute top-28 left-4 z-[120] flex h-10 w-10 items-center justify-center rounded-full bg-white/30 text-[#8B0000] shadow-lg transition-transform hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 focus:outline-none"
+      >
+        {isMuted ? (
+          <svg
+            className="h-5 w-5"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M11 5L6 9H2v6h4l5 4V5z" />
+            <line x1="23" y1="9" x2="17" y2="15" />
+            <line x1="17" y1="9" x2="23" y2="15" />
+          </svg>
+        ) : (
+          <svg
+            className="h-5 w-5"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M11 5L6 9H2v6h4l5 4V5z" />
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
+          </svg>
+        )}
       </button>
       {showLoaderOverlay && (
         <div
@@ -724,13 +932,47 @@ function GamePage() {
             }}
           />
 
-          <button
-            onClick={gameCompleted ? resetGame : handlePull}
-            disabled={(!gameCompleted && pullCount >= TOTAL_PULLS) || isVideoPlaying}
-            className="absolute bottom-5 left-1/2 -translate-x-1/2 px-6 py-3 text-[1.1rem] bg-white text-[#8B0000] border-none rounded-full cursor-pointer font-bold whitespace-nowrap shadow-lg transition-all hover:bg-gray-100 hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 active:shadow-md z-[100] disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            {gameCompleted ? 'Започни от начало' : 'Дърпай Асене!'}
-          </button>
+          <div className="absolute bottom-5 left-1/2 -translate-x-1/2 flex items-center gap-3 z-[100]">
+            <button
+              onClick={gameCompleted ? resetGame : handlePull}
+              disabled={(!gameCompleted && pullCount >= TOTAL_PULLS) || isVideoPlaying}
+              className="px-6 py-3 text-[1.1rem] bg-white text-[#8B0000] border-none rounded-full cursor-pointer font-bold whitespace-nowrap shadow-lg transition-all hover:bg-gray-100 hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 active:shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {gameCompleted ? 'Започни от начало' : 'Дърпай Асене!'}
+            </button>
+            {/* Steps counter */}
+            <div className="flex items-center justify-center rounded-full bg-white/80 px-4 py-2 shadow-lg">
+              <span className="text-[#8B0000] font-bold text-sm">
+                {pullCount}/{TOTAL_PULLS}
+              </span>
+            </div>
+          </div>
+
+          {/* Hidden preloaded videos */}
+          <video
+            ref={video1Ref}
+            src={pullVideoStage1Url}
+            preload="auto"
+            className="hidden"
+            playsInline
+            muted
+          />
+          <video
+            ref={video4Ref}
+            src={pullVideoStage4Url}
+            preload="auto"
+            className="hidden"
+            playsInline
+            muted
+          />
+          <video
+            ref={video5Ref}
+            src={pullVideoStage5Url}
+            preload="auto"
+            className="hidden"
+            playsInline
+            muted
+          />
 
           {showPullVideo && currentPullVideoUrl && (
             <div className="absolute inset-0 z-[200] flex justify-end pointer-events-none">
@@ -743,9 +985,13 @@ function GamePage() {
                   src={currentPullVideoUrl}
                   className="w-full h-full object-cover"
                   playsInline
-                  preload="auto"
                   onEnded={handlePullVideoEnded}
+                  onLoadedMetadata={(e) => {
+                    e.target.volume = 0.7
+                  }}
                   controls={false}
+                  preload="auto"
+                  volume={0.7}
                 />
               </div>
             </div>
