@@ -109,6 +109,40 @@ function GamePage() {
     }
   }, [])
 
+  useEffect(() => {
+    const html = document.documentElement
+    const body = document.body
+    const previousHtmlOverflow = html.style.overflow
+    const previousBodyOverflow = body.style.overflow
+
+    let scrollTimeout
+    let lockTimeout
+
+    if (!assetsLoaded) {
+      html.style.overflow = 'auto'
+      body.style.overflow = 'auto'
+
+      scrollTimeout = setTimeout(() => {
+        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })
+      }, 100)
+
+      lockTimeout = setTimeout(() => {
+        html.style.overflow = 'hidden'
+        body.style.overflow = 'hidden'
+      }, 1100)
+    } else {
+      html.style.overflow = 'hidden'
+      body.style.overflow = 'hidden'
+    }
+
+    return () => {
+      html.style.overflow = previousHtmlOverflow
+      body.style.overflow = previousBodyOverflow
+      if (scrollTimeout) clearTimeout(scrollTimeout)
+      if (lockTimeout) clearTimeout(lockTimeout)
+    }
+  }, [assetsLoaded])
+
   // Calculate rope start point based on fixed point on Asen's image
   useEffect(() => {
     if (
