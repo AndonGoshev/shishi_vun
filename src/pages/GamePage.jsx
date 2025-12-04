@@ -37,6 +37,7 @@ function GamePage() {
   const [pullCount, setPullCount] = useState(0)
   const [peevskiHeight, setPeevskiHeight] = useState(INITIAL_PEEVSKI_HEIGHT)
   const [assetsLoaded, setAssetsLoaded] = useState(false)
+  const [showLoaderOverlay, setShowLoaderOverlay] = useState(true)
   const [shakeOffsets, setShakeOffsets] = useState({
     asen: { x: 0, y: 0 },
     peevski: { x: 0, y: 0 },
@@ -108,6 +109,19 @@ function GamePage() {
       }
     }
   }, [])
+
+  useEffect(() => {
+    if (!assetsLoaded) {
+      setShowLoaderOverlay(true)
+      return
+    }
+
+    const fadeTimeout = setTimeout(() => {
+      setShowLoaderOverlay(false)
+    }, 500)
+
+    return () => clearTimeout(fadeTimeout)
+  }, [assetsLoaded])
 
   useEffect(() => {
     const html = document.documentElement
@@ -340,15 +354,25 @@ function GamePage() {
       style={{ backgroundImage: `url(${parliamentBg})` }}
       onClick={handleContainerClick}
     >
-      {!assetsLoaded ? (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/60 text-white text-lg font-semibold z-50">
-          Зареждане...
+      {showLoaderOverlay && (
+        <div
+          className={`absolute inset-0 flex items-center justify-center bg-black/60 text-white text-lg font-semibold z-50 transition-opacity duration-500 ${assetsLoaded ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+        >
+          <div className="flex items-center gap-3">
+            <div className="h-8 w-8 border-4 border-white/70 border-t-transparent rounded-full animate-spin" />
+            <span>Зареждане...</span>
+          </div>
         </div>
-      ) : (
+      )}
+
+      {assetsLoaded && (
         <>
           {/* Debug overlay */}
           {debugMode && (
-            <div className="absolute top-4 left-4 bg-black/80 text-white p-4 rounded-lg text-xs z-50 max-h-[80vh] overflow-y-auto">
+            <div
+              className="absolute top-4 left-4 bg-black/80 text-white p-4 rounded-lg text-xs z-50 max-h-[80vh] overflow-y-auto"
+              style={{ display: 'none' }}
+            >
               <div className="mb-2 font-bold">Debug Mode - Click to get coordinates</div>
               {clickPosition && (
                 <div>
@@ -438,12 +462,12 @@ function GamePage() {
           {ropeEditMode && debugMode && (
             <>
               <div
-                className="absolute w-4 h-4 bg-green-500 border-2 border-white rounded-full z-50 rope-handle-start pointer-events-none"
+                className="hidden absolute w-4 h-4 bg-green-500 border-2 border-white rounded-full z-50 rope-handle-start pointer-events-none"
                 style={{ left: `${ropeStart.x}%`, top: `${ropeStart.y}%`, transform: 'translate(-50%, -50%)' }}
                 title="Rope start (fixed to Asen's hand - not editable)"
               />
               <div
-                className="absolute w-4 h-4 bg-red-500 border-2 border-white rounded-full cursor-pointer z-50 rope-handle-end"
+                className="hidden absolute w-4 h-4 bg-red-500 border-2 border-white rounded-full cursor-pointer z-50 rope-handle-end"
                 style={{ left: `${ropeEnd.x}%`, top: `${ropeEnd.y}%`, transform: 'translate(-50%, -50%)' }}
                 onClick={(e) => e.stopPropagation()}
               />
@@ -514,7 +538,7 @@ function GamePage() {
           <button
             onClick={handlePull}
             disabled={pullCount >= TOTAL_PULLS}
-            className="absolute bottom-5 left-1/2 -translate-x-1/2 px-4 py-2 text-[0.75rem] bg-white text-[#8B0000] border-none rounded-full cursor-pointer font-bold whitespace-nowrap shadow-lg transition-all hover:bg-gray-100 hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 active:shadow-md z-[100] disabled:opacity-60 disabled:cursor-not-allowed"
+            className="absolute bottom-5 left-1/2 -translate-x-1/2 px-6 py-3 text-[1.1rem] bg-white text-[#8B0000] border-none rounded-full cursor-pointer font-bold whitespace-nowrap shadow-lg transition-all hover:bg-gray-100 hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 active:shadow-md z-[100] disabled:opacity-60 disabled:cursor-not-allowed"
           >
             Дърпай Асене!
           </button>
