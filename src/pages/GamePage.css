@@ -3,22 +3,16 @@
 /* Game page container styles */
 
 .asen-character {
-  /* Asen positioned at bottom left */
+  position: absolute;
   bottom: 0;
-  left: 0;
-  /* Adjust size as needed */
+  left: 6%;
+  height: 220px;
   width: auto;
-  height: auto;
-  z-index: 10;
+  z-index: 12;
 }
 
 .peevski-character {
-  /* Peevski positioned at exact point near parliament doors */
-  left: 48.49%;
-  top: 55.00%;
-  transform: translate(-50%, -50%);
-  height: 5px;
-  width: auto;
-  z-index: 10;
+  position: absolute;
+  z-index: 11;
 }
 

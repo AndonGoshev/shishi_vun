@@ -7,16 +7,25 @@ import peevski from '../assets/images/peevski.png'
 import rope from '../assets/images/rope.png'
 import './GamePage.css'
 
+const TOTAL_PULLS = 100
+const INITIAL_ROPE_START = { x: 35.17, y: 75.07 }
+const INITIAL_ROPE_END = { x: 48.49, y: 55.0 }
+const FINAL_ROPE_END = { x: 71.09, y: 76.94 }
+const INITIAL_PEEVSKI_HEIGHT = 30
+const FINAL_PEEVSKI_HEIGHT = 220
+
 function GamePage() {
   const [clickPosition, setClickPosition] = useState(null)
   const [debugMode, setDebugMode] = useState(true)
   const containerRef = useRef(null)
-  const [ropeStart, setRopeStart] = useState({ x: 35.17, y: 75.07 })
-  const [ropeEnd, setRopeEnd] = useState({ x: 48.49, y: 55.0 })
+  const [ropeStart, setRopeStart] = useState(INITIAL_ROPE_START)
+  const [ropeEnd, setRopeEnd] = useState(INITIAL_ROPE_END)
   const [ropeEditMode, setRopeEditMode] = useState(true)
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 })
   const [ropeImage] = useImage(rope)
   const ropeStrokeColor = '#c49a6c'
+  const [pullCount, setPullCount] = useState(0)
+  const [peevskiHeight, setPeevskiHeight] = useState(INITIAL_PEEVSKI_HEIGHT)
 
   // Calculate container size and rope segments
   useEffect(() => {
@@ -48,11 +57,30 @@ function GamePage() {
     return [startX, startY, endX, endY]
   })()
 
-  const desiredRopeThickness = 6
+  const desiredRopeThickness = 12
   const ropeStrokeWidth = desiredRopeThickness
   const ropePatternScale = ropeImage && ropeImage.height
     ? desiredRopeThickness / ropeImage.height
     : 0.25
+
+  const handlePull = () => {
+    if (pullCount >= TOTAL_PULLS) return
+
+    const nextCount = pullCount + 1
+    const progress = nextCount / TOTAL_PULLS
+
+    const newRopeEnd = {
+      x: INITIAL_ROPE_END.x + (FINAL_ROPE_END.x - INITIAL_ROPE_END.x) * progress,
+      y: INITIAL_ROPE_END.y + (FINAL_ROPE_END.y - INITIAL_ROPE_END.y) * progress
+    }
+
+    const newPeevskiHeight =
+      INITIAL_PEEVSKI_HEIGHT + (FINAL_PEEVSKI_HEIGHT - INITIAL_PEEVSKI_HEIGHT) * progress
+
+    setPullCount(nextCount)
+    setRopeEnd(newRopeEnd)
+    setPeevskiHeight(newPeevskiHeight)
+  }
 
   const handleContainerClick = (e) => {
     if (!debugMode) return
@@ -97,7 +125,7 @@ function GamePage() {
   }
 
   return (
-    <div 
+    <div
       ref={containerRef}
       className="w-full h-full bg-cover bg-center bg-no-repeat relative game-page-container"
       style={{ backgroundImage: `url(${parliamentBg})` }}
@@ -114,7 +142,7 @@ function GamePage() {
               <div className="mt-2 text-yellow-300">
                 Use: left: {clickPosition.percentX}%, top: {clickPosition.percentY}%
               </div>
-              <button 
+              <button
                 onClick={copyCoordinates}
                 className="mt-2 px-2 py-1 bg-blue-600 rounded text-white text-xs hover:bg-blue-700"
               >
@@ -122,7 +150,7 @@ function GamePage() {
               </button>
             </div>
           )}
-          
+
           {/* Rope Position Editor */}
           <div className="mt-4 pt-4 border-t border-white/20">
             <div className="font-bold mb-2">Rope Position Editor</div>
@@ -178,8 +206,8 @@ function GamePage() {
               {ropeEditMode ? '✓ Click to Set' : 'Click Mode Off'}
             </button>
           </div>
-          
-          <button 
+
+          <button
             onClick={(e) => {
               e.stopPropagation()
               setDebugMode(false)
@@ -208,12 +236,8 @@ function GamePage() {
       )}
 
       {/* Asen at bottom left */}
-      <img 
-        src={asen} 
-        alt="Asen" 
-        className="absolute bottom-0 left-[-5%] asen-character w-1/2 h-1/2"
-      />
-      
+      <img src={asen} alt="Asen" className="asen-character" />
+
       {/* Rope connecting asen to peevski using Konva */}
       {containerSize.width > 0 && containerSize.height > 0 && ropePoints.length === 4 && (
         <Stage
@@ -239,15 +263,26 @@ function GamePage() {
           </Layer>
         </Stage>
       )}
-      
-      {/* Peevski at parliament doors */}
-      <img 
-        src={peevski} 
-        alt="Peevski" 
-        className="absolute peevski-character"
+
+      {/* Peevski at end of rope */}
+      <img
+        src={peevski}
+        alt="Peevski"
+        className="peevski-character"
+        style={{
+          left: `${ropeEnd.x}%`,
+          top: `${ropeEnd.y}%`,
+          transform: 'translate(-50%, -100%)',
+          height: `${peevskiHeight}px`,
+          width: 'auto',
+        }}
       />
-      
-      <button className="absolute bottom-5 left-1/2 -translate-x-1/2 px-4 py-2 text-[0.75rem] bg-white text-[#8B0000] border-none rounded-full cursor-pointer font-bold whitespace-nowrap shadow-lg transition-all hover:bg-gray-100 hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 active:shadow-md z-[100]">
+
+      <button
+        onClick={handlePull}
+        disabled={pullCount >= TOTAL_PULLS}
+        className="absolute bottom-5 left-1/2 -translate-x-1/2 px-4 py-2 text-[0.75rem] bg-white text-[#8B0000] border-none rounded-full cursor-pointer font-bold whitespace-nowrap shadow-lg transition-all hover:bg-gray-100 hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 active:shadow-md z-[100] disabled:opacity-60 disabled:cursor-not-allowed"
+      >
         Дърпай Асене!
       </button>
     </div>
