@@ -1,14 +1,14 @@
-import { useState, useRef, useEffect } from 'react'
-import { Stage, Layer, Line } from 'react-konva'
+import { useState, useRef, useEffect, useMemo } from 'react'
+import { Stage, Layer, Line, Image as KonvaImage } from 'react-konva'
 import useImage from 'use-image'
 import parliamentBg from '../assets/images/parliament-bg.png'
 import asen from '../assets/images/asen.png'
 import peevski from '../assets/images/peevski.png'
-import rope from '../assets/images/rope.png'
+import rope from '../assets/images/rope-texture.png'
 import './GamePage.css'
 
 const TOTAL_PULLS = 100
-const INITIAL_ROPE_START = { x: 35.17, y: 75.07 }
+const INITIAL_ROPE_START = { x: 35.17, y: 98.07 }
 const INITIAL_ROPE_END = { x: 49.49, y: 56.0 }
 const FINAL_ROPE_END = { x: 65.09, y: 67.94 }
 const INITIAL_PEEVSKI_HEIGHT = 20
@@ -17,6 +17,10 @@ const FINAL_PEEVSKI_HEIGHT = 320
 // These represent where Asen's hand is on his image (0-1 range, where 0.5 = center)
 // Detected: 81.5% from left, 50.6% from top of Asen's image
 const ASEN_HAND_POINT = { x: 0.815, y: 0.506 }
+const SHAKE_DURATION = 200
+const ASEN_SHAKE_STRENGTH = 5
+const ROPE_SHAKE_STRENGTH = 3
+const PEEVSKI_SHAKE_STRENGTH = 2
 
 function GamePage() {
   const [clickPosition, setClickPosition] = useState(null)
@@ -31,6 +35,12 @@ function GamePage() {
   const ropeStrokeColor = '#c49a6c'
   const [pullCount, setPullCount] = useState(0)
   const [peevskiHeight, setPeevskiHeight] = useState(INITIAL_PEEVSKI_HEIGHT)
+  const [shakeOffsets, setShakeOffsets] = useState({
+    asen: { x: 0, y: 0 },
+    peevski: { x: 0, y: 0 },
+    rope: { x: 0, y: 0 },
+  })
+  const shakeTimeoutRef = useRef(null)
 
   useEffect(() => {
     const updateSize = () => {
@@ -45,6 +55,14 @@ function GamePage() {
     updateSize()
     window.addEventListener('resize', updateSize)
     return () => window.removeEventListener('resize', updateSize)
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (shakeTimeoutRef.current) {
+        clearTimeout(shakeTimeoutRef.current)
+      }
+    }
   }, [])
 
   // Calculate rope start point based on fixed point on Asen's image
@@ -76,7 +94,7 @@ function GamePage() {
     setRopeStart(computedStart)
   }, [containerSize.width, containerSize.height, pullCount])
 
-  const ropePoints = (() => {
+  const ropePoints = useMemo(() => {
     if (!containerSize.width || !containerSize.height) {
       return []
     }
@@ -87,11 +105,94 @@ function GamePage() {
     const endY = (ropeEnd.y / 100) * containerSize.height
 
     return [startX, startY, endX, endY]
-  })()
+  }, [containerSize.width, containerSize.height, ropeStart.x, ropeStart.y, ropeEnd.x, ropeEnd.y])
 
-  const desiredRopeThickness = 4
-  const ropeStrokeWidth = desiredRopeThickness
-  const ropePatternScale = ropeImage && ropeImage.height ? desiredRopeThickness / ropeImage.height : 0.25
+  const adjustedRopePoints = useMemo(() => {
+    if (ropePoints.length !== 4) return ropePoints
+    const [startX, startY, endX, endY] = ropePoints
+    return [
+      startX + shakeOffsets.rope.x,
+      startY + shakeOffsets.rope.y,
+      endX + shakeOffsets.rope.x,
+      endY + shakeOffsets.rope.y,
+    ]
+  }, [ropePoints, shakeOffsets.rope.x, shakeOffsets.rope.y])
+
+  const desiredRopeThickness = 6
+
+  const ropeSegments = useMemo(() => {
+    if (!ropeImage || ropePoints.length !== 4) return []
+
+    const [startX, startY, endX, endY] = ropePoints
+    const deltaX = endX - startX
+    const deltaY = endY - startY
+    const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY)
+    if (distance === 0) return []
+
+    const angleRad = Math.atan2(deltaY, deltaX)
+    const angleDeg = (angleRad * 180) / Math.PI
+    const unitX = deltaX / distance
+    const unitY = deltaY / distance
+
+    const scale = desiredRopeThickness / ropeImage.height
+    const segmentLength = ropeImage.width * scale
+    const segments = []
+
+    // Ensure at least one segment even for very short ropes
+    const cappedSegmentLength = segmentLength > 0 ? segmentLength : distance
+
+    for (let traveled = 0; traveled < distance; traveled += cappedSegmentLength) {
+      const centerDistance = Math.min(traveled + cappedSegmentLength / 2, distance)
+      const x = startX + unitX * centerDistance
+      const y = startY + unitY * centerDistance
+
+      segments.push({
+        x,
+        y,
+        rotation: angleDeg,
+        scale,
+      })
+    }
+
+    return segments
+  }, [ropeImage, ropePoints])
+
+  const triggerShake = () => {
+    if (shakeTimeoutRef.current) {
+      clearTimeout(shakeTimeoutRef.current)
+    }
+
+    const randomOffset = (strength, horizontalOnly = false) => ({
+      x: (Math.random() - 0.5) * strength,
+      y: horizontalOnly ? 0 : (Math.random() - 0.5) * strength,
+    })
+
+    // Asen, rope, and Peevski move left first (negative x), then return to original
+    setShakeOffsets({
+      asen: { x: -ASEN_SHAKE_STRENGTH, y: 0 },
+      peevski: { x: -PEEVSKI_SHAKE_STRENGTH, y: 0 },
+      rope: { x: -ROPE_SHAKE_STRENGTH, y: 0 },
+    })
+
+    // After half the duration, return all to original position
+    setTimeout(() => {
+      setShakeOffsets((prev) => ({
+        ...prev,
+        asen: { x: 0, y: 0 },
+        peevski: { x: 0, y: 0 },
+        rope: { x: 0, y: 0 },
+      }))
+    }, SHAKE_DURATION / 2)
+
+    shakeTimeoutRef.current = setTimeout(() => {
+      setShakeOffsets({
+        asen: { x: 0, y: 0 },
+        peevski: { x: 0, y: 0 },
+        rope: { x: 0, y: 0 },
+      })
+      shakeTimeoutRef.current = null
+    }, SHAKE_DURATION)
+  }
 
   const handlePull = () => {
     if (pullCount >= TOTAL_PULLS) return
@@ -110,6 +211,7 @@ function GamePage() {
     setPullCount(nextCount)
     setRopeEnd(newRopeEnd)
     setPeevskiHeight(newPeevskiHeight)
+    triggerShake()
   }
 
   const handleContainerClick = (e) => {
@@ -252,14 +354,6 @@ function GamePage() {
       {ropeEditMode && debugMode && (
         <>
           <div
-            ref={asenRef}
-            src={asen}
-            alt="Asen"
-            className="absolute w-16 h-16 asen-character"
-            style={{ left: `${ropeStart.x}%`, top: `${ropeStart.y}%`, transform: 'translate(-50%, -50%)' }}
-            onClick={(e) => e.stopPropagation()}
-          />
-          <div
             className="absolute w-4 h-4 bg-green-500 border-2 border-white rounded-full z-50 rope-handle-start pointer-events-none"
             style={{ left: `${ropeStart.x}%`, top: `${ropeStart.y}%`, transform: 'translate(-50%, -50%)' }}
             title="Rope start (fixed to Asen's hand - not editable)"
@@ -273,7 +367,15 @@ function GamePage() {
       )}
 
       {/* Asen at bottom left */}
-      <img src={asen} alt="Asen" className="asen-character" ref={asenRef} />
+      <img
+        src={asen}
+        alt="Asen"
+        className="asen-character"
+        ref={asenRef}
+        style={{
+          transform: `translate(${shakeOffsets.asen.x}px, ${shakeOffsets.asen.y}px)`,
+        }}
+      />
 
       {/* Rope connecting asen to peevski using Konva */}
       {containerSize.width > 0 && containerSize.height > 0 && ropePoints.length === 4 && (
@@ -285,18 +387,29 @@ function GamePage() {
           listening={false}
         >
           <Layer>
-            <Line
-              points={ropePoints}
-              stroke={ropeStrokeColor}
-              strokeWidth={ropeStrokeWidth}
-              lineCap="round"
-              lineJoin="round"
-              strokePatternImage={ropeImage || undefined}
-              strokePatternRepeat="repeat"
-              strokePatternRotation={45}
-              strokePatternScaleX={ropePatternScale}
-              strokePatternScaleY={ropePatternScale}
-            />
+            {ropeSegments.length > 0 && ropeImage ? (
+              ropeSegments.map((segment, index) => (
+                <KonvaImage
+                  key={`rope-segment-${index}`}
+                  image={ropeImage}
+                  x={segment.x + shakeOffsets.rope.x}
+                  y={segment.y + shakeOffsets.rope.y}
+                  offsetX={ropeImage.width / 2}
+                  offsetY={ropeImage.height / 2}
+                  scaleX={segment.scale}
+                  scaleY={segment.scale}
+                  rotation={segment.rotation}
+                />
+              ))
+            ) : (
+              <Line
+                points={adjustedRopePoints}
+                stroke={ropeStrokeColor}
+                strokeWidth={desiredRopeThickness}
+                lineCap="round"
+                lineJoin="round"
+              />
+            )}
           </Layer>
         </Stage>
       )}
@@ -309,7 +422,7 @@ function GamePage() {
         style={{
           left: `${ropeEnd.x}%`,
           top: `${ropeEnd.y}%`,
-          transform: 'translate(-15%, -53%)',
+          transform: `translate(-15%, -53%) translate(${shakeOffsets.peevski.x}px, ${shakeOffsets.peevski.y}px)`,
           height: `${peevskiHeight}px`,
         }}
       />
