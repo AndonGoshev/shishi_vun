@@ -43,7 +43,7 @@ const PEEVSKI_SHAKE_STRENGTH = 2
 const LOADER_MIN_DURATION = 2000
 const PULL_TO_REFRESH_THRESHOLD = 80
 
-function GamePage({ isMuted, onToggleMute, onStopBackgroundMusic }) {
+function GamePage({ isMuted, onToggleMute, onStopBackgroundMusic, onStartAudio }) {
   const navigate = useNavigate()
   const [clickPosition, setClickPosition] = useState(null)
   const [debugMode, setDebugMode] = useState(true)
@@ -239,6 +239,18 @@ function GamePage({ isMuted, onToggleMute, onStopBackgroundMusic }) {
       }
     }
   }, [])
+
+  // Start background music when GamePage mounts or when restarting
+  useEffect(() => {
+    if (onStartAudio && assetsLoaded) {
+      // Start audio when page loads or when assets are ready
+      setTimeout(() => {
+        if (onStartAudio) {
+          onStartAudio()
+        }
+      }, 500) // Small delay to ensure audio context is ready
+    }
+  }, [assetsLoaded, onStartAudio])
 
   // Preload videos when component mounts
   useEffect(() => {
@@ -632,6 +644,10 @@ function GamePage({ isMuted, onToggleMute, onStopBackgroundMusic }) {
       peevski: { x: 0, y: 0 },
       rope: { x: 0, y: 0 },
     })
+    // Restart background music when resetting the game
+    if (onStartAudio) {
+      onStartAudio()
+    }
   }
 
   const handleContainerClick = (e) => {

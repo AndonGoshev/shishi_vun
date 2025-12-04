@@ -103,7 +103,7 @@ function App() {
         <Router>
           <Routes>
             <Route path="/" element={<WelcomePage onStartAudio={handleStartAudio} />} />
-            <Route path="/app" element={<GamePage isMuted={isMuted} onToggleMute={handleToggleMute} onStopBackgroundMusic={handleStopBackgroundMusic} />} />
+            <Route path="/app" element={<GamePage isMuted={isMuted} onToggleMute={handleToggleMute} onStopBackgroundMusic={handleStopBackgroundMusic} onStartAudio={handleStartAudio} />} />
           </Routes>
         </Router>
       </div>
