@@ -21,6 +21,7 @@ const SHAKE_DURATION = 200
 const ASEN_SHAKE_STRENGTH = 5
 const ROPE_SHAKE_STRENGTH = 3
 const PEEVSKI_SHAKE_STRENGTH = 2
+const LOADER_MIN_DURATION = 2000
 
 function GamePage() {
   const [clickPosition, setClickPosition] = useState(null)
@@ -35,6 +36,7 @@ function GamePage() {
   const ropeStrokeColor = '#c49a6c'
   const [pullCount, setPullCount] = useState(0)
   const [peevskiHeight, setPeevskiHeight] = useState(INITIAL_PEEVSKI_HEIGHT)
+  const [assetsLoaded, setAssetsLoaded] = useState(false)
   const [shakeOffsets, setShakeOffsets] = useState({
     asen: { x: 0, y: 0 },
     peevski: { x: 0, y: 0 },
@@ -65,6 +67,48 @@ function GamePage() {
     }
   }, [])
 
+  useEffect(() => {
+    let isMounted = true
+    let loaderTimeout
+
+    const loadImage = (src) =>
+      new Promise((resolve, reject) => {
+        const img = new Image()
+        img.src = src
+        if (img.complete) {
+          resolve()
+          return
+        }
+        img.onload = resolve
+        img.onerror = reject
+      })
+
+    Promise.all([asen, peevski, parliamentBg, rope].map(loadImage))
+      .then(() => {
+        if (!isMounted) return
+        loaderTimeout = setTimeout(() => {
+          if (isMounted) {
+            setAssetsLoaded(true)
+          }
+        }, LOADER_MIN_DURATION)
+      })
+      .catch(() => {
+        if (!isMounted) return
+        loaderTimeout = setTimeout(() => {
+          if (isMounted) {
+            setAssetsLoaded(true)
+          }
+        }, LOADER_MIN_DURATION)
+      })
+
+    return () => {
+      isMounted = false
+      if (loaderTimeout) {
+        clearTimeout(loaderTimeout)
+      }
+    }
+  }, [])
+
   // Calculate rope start point based on fixed point on Asen's image
   useEffect(() => {
     if (
@@ -72,7 +116,7 @@ function GamePage() {
       !asenRef.current ||
       !containerSize.width ||
       !containerSize.height ||
-      pullCount > 0
+      !assetsLoaded
     ) {
       return
     }
@@ -92,7 +136,7 @@ function GamePage() {
     }
 
     setRopeStart(computedStart)
-  }, [containerSize.width, containerSize.height, pullCount])
+  }, [containerSize.width, containerSize.height, assetsLoaded])
 
   const ropePoints = useMemo(() => {
     if (!containerSize.width || !containerSize.height) {
@@ -215,7 +259,7 @@ function GamePage() {
   }
 
   const handleContainerClick = (e) => {
-    if (!debugMode) return
+    if (!debugMode || !assetsLoaded) return
     
     const rect = e.currentTarget.getBoundingClientRect()
     const x = e.clientX - rect.left
@@ -262,178 +306,186 @@ function GamePage() {
       style={{ backgroundImage: `url(${parliamentBg})` }}
       onClick={handleContainerClick}
     >
-      {/* Debug overlay */}
-      {debugMode && (
-        <div className="absolute top-4 left-4 bg-black/80 text-white p-4 rounded-lg text-xs z-50 max-h-[80vh] overflow-y-auto">
-          <div className="mb-2 font-bold">Debug Mode - Click to get coordinates</div>
-          {clickPosition && (
-            <div>
-              <div>X: {clickPosition.percentX}% ({clickPosition.x}px)</div>
-              <div>Y: {clickPosition.percentY}% ({clickPosition.y}px)</div>
-              <div className="mt-2 text-yellow-300">
-                Use: left: {clickPosition.percentX}%, top: {clickPosition.percentY}%
+      {!assetsLoaded ? (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/60 text-white text-lg font-semibold z-50">
+          Зареждане...
+        </div>
+      ) : (
+        <>
+          {/* Debug overlay */}
+          {debugMode && (
+            <div className="absolute top-4 left-4 bg-black/80 text-white p-4 rounded-lg text-xs z-50 max-h-[80vh] overflow-y-auto">
+              <div className="mb-2 font-bold">Debug Mode - Click to get coordinates</div>
+              {clickPosition && (
+                <div>
+                  <div>X: {clickPosition.percentX}% ({clickPosition.x}px)</div>
+                  <div>Y: {clickPosition.percentY}% ({clickPosition.y}px)</div>
+                  <div className="mt-2 text-yellow-300">
+                    Use: left: {clickPosition.percentX}%, top: {clickPosition.percentY}%
+                  </div>
+                  <button
+                    onClick={copyCoordinates}
+                    className="mt-2 px-2 py-1 bg-blue-600 rounded text-white text-xs hover:bg-blue-700"
+                  >
+                    Copy Coordinates
+                  </button>
+                </div>
+              )}
+
+              {/* Rope Position Editor */}
+              <div className="mt-4 pt-4 border-t border-white/20">
+                <div className="font-bold mb-2">Rope Position Editor</div>
+                <div className="mb-2">
+                  <label className="block text-xs mb-1">Start Point (Asen's hands) - Auto-calculated</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={ropeStart.x.toFixed(2)}
+                      disabled
+                      className="w-20 px-1 py-0.5 text-black rounded text-xs bg-gray-200 cursor-not-allowed"
+                      placeholder="X %"
+                    />
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={ropeStart.y.toFixed(2)}
+                      disabled
+                      className="w-20 px-1 py-0.5 text-black rounded text-xs bg-gray-200 cursor-not-allowed"
+                      placeholder="Y %"
+                    />
+                  </div>
+                </div>
+                <div className="mb-2">
+                  <label className="block text-xs mb-1">End Point (Peevski)</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={ropeEnd.x}
+                      onChange={(e) => setRopeEnd({ ...ropeEnd, x: parseFloat(e.target.value) || 0 })}
+                      className="w-20 px-1 py-0.5 text-black rounded text-xs"
+                      placeholder="X %"
+                    />
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={ropeEnd.y}
+                      onChange={(e) => setRopeEnd({ ...ropeEnd, y: parseFloat(e.target.value) || 0 })}
+                      className="w-20 px-1 py-0.5 text-black rounded text-xs"
+                      placeholder="Y %"
+                    />
+                  </div>
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setRopeEditMode(!ropeEditMode)
+                  }}
+                  className={`mt-2 px-2 py-1 rounded text-white text-xs ${ropeEditMode ? 'bg-green-600' : 'bg-gray-600'}`}
+                >
+                  {ropeEditMode ? '✓ Click to Set' : 'Click Mode Off'}
+                </button>
               </div>
+
               <button
-                onClick={copyCoordinates}
-                className="mt-2 px-2 py-1 bg-blue-600 rounded text-white text-xs hover:bg-blue-700"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setDebugMode(false)
+                }}
+                className="mt-2 px-2 py-1 bg-red-600 rounded text-white text-xs"
               >
-                Copy Coordinates
+                Disable Debug
               </button>
             </div>
           )}
 
-          {/* Rope Position Editor */}
-          <div className="mt-4 pt-4 border-t border-white/20">
-            <div className="font-bold mb-2">Rope Position Editor</div>
-            <div className="mb-2">
-              <label className="block text-xs mb-1">Start Point (Asen's hands) - Auto-calculated</label>
-              <div className="flex gap-2">
-                <input
-                  type="number"
-                  step="0.01"
-                  value={ropeStart.x.toFixed(2)}
-                  disabled
-                  className="w-20 px-1 py-0.5 text-black rounded text-xs bg-gray-200 cursor-not-allowed"
-                  placeholder="X %"
-                />
-                <input
-                  type="number"
-                  step="0.01"
-                  value={ropeStart.y.toFixed(2)}
-                  disabled
-                  className="w-20 px-1 py-0.5 text-black rounded text-xs bg-gray-200 cursor-not-allowed"
-                  placeholder="Y %"
-                />
-              </div>
-            </div>
-            <div className="mb-2">
-              <label className="block text-xs mb-1">End Point (Peevski)</label>
-              <div className="flex gap-2">
-                <input
-                  type="number"
-                  step="0.01"
-                  value={ropeEnd.x}
-                  onChange={(e) => setRopeEnd({ ...ropeEnd, x: parseFloat(e.target.value) || 0 })}
-                  className="w-20 px-1 py-0.5 text-black rounded text-xs"
-                  placeholder="X %"
-                />
-                <input
-                  type="number"
-                  step="0.01"
-                  value={ropeEnd.y}
-                  onChange={(e) => setRopeEnd({ ...ropeEnd, y: parseFloat(e.target.value) || 0 })}
-                  className="w-20 px-1 py-0.5 text-black rounded text-xs"
-                  placeholder="Y %"
-                />
-              </div>
-            </div>
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                setRopeEditMode(!ropeEditMode)
-              }}
-              className={`mt-2 px-2 py-1 rounded text-white text-xs ${ropeEditMode ? 'bg-green-600' : 'bg-gray-600'}`}
+          {/* Rope handles for visual editing */}
+          {ropeEditMode && debugMode && (
+            <>
+              <div
+                className="absolute w-4 h-4 bg-green-500 border-2 border-white rounded-full z-50 rope-handle-start pointer-events-none"
+                style={{ left: `${ropeStart.x}%`, top: `${ropeStart.y}%`, transform: 'translate(-50%, -50%)' }}
+                title="Rope start (fixed to Asen's hand - not editable)"
+              />
+              <div
+                className="absolute w-4 h-4 bg-red-500 border-2 border-white rounded-full cursor-pointer z-50 rope-handle-end"
+                style={{ left: `${ropeEnd.x}%`, top: `${ropeEnd.y}%`, transform: 'translate(-50%, -50%)' }}
+                onClick={(e) => e.stopPropagation()}
+              />
+            </>
+          )}
+
+          {/* Asen at bottom left */}
+          <img
+            src={asen}
+            alt="Asen"
+            className="asen-character"
+            ref={asenRef}
+            style={{
+              transform: `translate(${shakeOffsets.asen.x}px, ${shakeOffsets.asen.y}px)`
+            }}
+          />
+
+          {/* Rope connecting asen to peevski using Konva */}
+          {containerSize.width > 0 && containerSize.height > 0 && ropePoints.length === 4 && (
+            <Stage
+              width={containerSize.width}
+              height={containerSize.height}
+              className="absolute top-0 left-0 pointer-events-none"
+              style={{ zIndex: 20 }}
+              listening={false}
             >
-              {ropeEditMode ? '✓ Click to Set' : 'Click Mode Off'}
-            </button>
-          </div>
+              <Layer>
+                {ropeSegments.length > 0 && ropeImage ? (
+                  ropeSegments.map((segment, index) => (
+                    <KonvaImage
+                      key={`rope-segment-${index}`}
+                      image={ropeImage}
+                      x={segment.x + shakeOffsets.rope.x}
+                      y={segment.y + shakeOffsets.rope.y}
+                      offsetX={ropeImage.width / 2}
+                      offsetY={ropeImage.height / 2}
+                      scaleX={segment.scale}
+                      scaleY={segment.scale}
+                      rotation={segment.rotation}
+                    />
+                  ))
+                ) : (
+                  <Line
+                    points={adjustedRopePoints}
+                    stroke={ropeStrokeColor}
+                    strokeWidth={desiredRopeThickness}
+                    lineCap="round"
+                    lineJoin="round"
+                  />
+                )}
+              </Layer>
+            </Stage>
+          )}
+
+          {/* Peevski at end of rope */}
+          <img
+            src={peevski}
+            alt="Peevski"
+            className="peevski-character"
+            style={{
+              left: `${ropeEnd.x}%`,
+              top: `${ropeEnd.y}%`,
+              transform: `translate(-15%, -53%) translate(${shakeOffsets.peevski.x}px, ${shakeOffsets.peevski.y}px)`,
+              height: `${peevskiHeight}px`,
+            }}
+          />
 
           <button
-            onClick={(e) => {
-              e.stopPropagation()
-              setDebugMode(false)
-            }}
-            className="mt-2 px-2 py-1 bg-red-600 rounded text-white text-xs"
+            onClick={handlePull}
+            disabled={pullCount >= TOTAL_PULLS}
+            className="absolute bottom-5 left-1/2 -translate-x-1/2 px-4 py-2 text-[0.75rem] bg-white text-[#8B0000] border-none rounded-full cursor-pointer font-bold whitespace-nowrap shadow-lg transition-all hover:bg-gray-100 hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 active:shadow-md z-[100] disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            Disable Debug
+            Дърпай Асене!
           </button>
-        </div>
-      )}
-
-      {/* Rope handles for visual editing */}
-      {ropeEditMode && debugMode && (
-        <>
-          <div
-            className="absolute w-4 h-4 bg-green-500 border-2 border-white rounded-full z-50 rope-handle-start pointer-events-none"
-            style={{ left: `${ropeStart.x}%`, top: `${ropeStart.y}%`, transform: 'translate(-50%, -50%)' }}
-            title="Rope start (fixed to Asen's hand - not editable)"
-          />
-          <div
-            className="absolute w-4 h-4 bg-red-500 border-2 border-white rounded-full cursor-pointer z-50 rope-handle-end"
-            style={{ left: `${ropeEnd.x}%`, top: `${ropeEnd.y}%`, transform: 'translate(-50%, -50%)' }}
-            onClick={(e) => e.stopPropagation()}
-          />
         </>
       )}
-
-      {/* Asen at bottom left */}
-      <img
-        src={asen}
-        alt="Asen"
-        className="asen-character"
-        ref={asenRef}
-        style={{
-          transform: `translate(${shakeOffsets.asen.x}px, ${shakeOffsets.asen.y}px)`,
-        }}
-      />
-
-      {/* Rope connecting asen to peevski using Konva */}
-      {containerSize.width > 0 && containerSize.height > 0 && ropePoints.length === 4 && (
-        <Stage
-          width={containerSize.width}
-          height={containerSize.height}
-          className="absolute top-0 left-0 pointer-events-none"
-          style={{ zIndex: 20 }}
-          listening={false}
-        >
-          <Layer>
-            {ropeSegments.length > 0 && ropeImage ? (
-              ropeSegments.map((segment, index) => (
-                <KonvaImage
-                  key={`rope-segment-${index}`}
-                  image={ropeImage}
-                  x={segment.x + shakeOffsets.rope.x}
-                  y={segment.y + shakeOffsets.rope.y}
-                  offsetX={ropeImage.width / 2}
-                  offsetY={ropeImage.height / 2}
-                  scaleX={segment.scale}
-                  scaleY={segment.scale}
-                  rotation={segment.rotation}
-                />
-              ))
-            ) : (
-              <Line
-                points={adjustedRopePoints}
-                stroke={ropeStrokeColor}
-                strokeWidth={desiredRopeThickness}
-                lineCap="round"
-                lineJoin="round"
-              />
-            )}
-          </Layer>
-        </Stage>
-      )}
-
-      {/* Peevski at end of rope */}
-      <img
-        src={peevski}
-        alt="Peevski"
-        className="peevski-character"
-        style={{
-          left: `${ropeEnd.x}%`,
-          top: `${ropeEnd.y}%`,
-          transform: `translate(-15%, -53%) translate(${shakeOffsets.peevski.x}px, ${shakeOffsets.peevski.y}px)`,
-          height: `${peevskiHeight}px`,
-        }}
-      />
-
-      <button
-        onClick={handlePull}
-        disabled={pullCount >= TOTAL_PULLS}
-        className="absolute bottom-5 left-1/2 -translate-x-1/2 px-4 py-2 text-[0.75rem] bg-white text-[#8B0000] border-none rounded-full cursor-pointer font-bold whitespace-nowrap shadow-lg transition-all hover:bg-gray-100 hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 active:shadow-md z-[100] disabled:opacity-60 disabled:cursor-not-allowed"
-      >
-        Дърпай Асене!
-      </button>
     </div>
   )
 }
