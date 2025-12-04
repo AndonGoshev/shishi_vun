@@ -13,11 +13,16 @@ const INITIAL_ROPE_END = { x: 48.49, y: 55.0 }
 const FINAL_ROPE_END = { x: 71.09, y: 76.94 }
 const INITIAL_PEEVSKI_HEIGHT = 30
 const FINAL_PEEVSKI_HEIGHT = 220
+// Fixed point on Asen's image where the rope starts (as percentage of image dimensions)
+// These represent where Asen's hand is on his image (0-1 range, where 0.5 = center)
+// Detected: 81.5% from left, 50.6% from top of Asen's image
+const ASEN_HAND_POINT = { x: 0.815, y: 0.506 }
 
 function GamePage() {
   const [clickPosition, setClickPosition] = useState(null)
   const [debugMode, setDebugMode] = useState(true)
   const containerRef = useRef(null)
+  const asenRef = useRef(null)
   const [ropeStart, setRopeStart] = useState(INITIAL_ROPE_START)
   const [ropeEnd, setRopeEnd] = useState(INITIAL_ROPE_END)
   const [ropeEditMode, setRopeEditMode] = useState(true)
@@ -27,14 +32,13 @@ function GamePage() {
   const [pullCount, setPullCount] = useState(0)
   const [peevskiHeight, setPeevskiHeight] = useState(INITIAL_PEEVSKI_HEIGHT)
 
-  // Calculate container size and rope segments
   useEffect(() => {
     const updateSize = () => {
       if (!containerRef.current) return
       const container = containerRef.current
       setContainerSize({
         width: container.offsetWidth,
-        height: container.offsetHeight
+        height: container.offsetHeight,
       })
     }
 
@@ -43,7 +47,35 @@ function GamePage() {
     return () => window.removeEventListener('resize', updateSize)
   }, [])
 
-  // Calculate rope line points for Konva
+  // Calculate rope start point based on fixed point on Asen's image
+  useEffect(() => {
+    if (
+      !containerRef.current ||
+      !asenRef.current ||
+      !containerSize.width ||
+      !containerSize.height ||
+      pullCount > 0
+    ) {
+      return
+    }
+
+    const containerRect = containerRef.current.getBoundingClientRect()
+    const asenRect = asenRef.current.getBoundingClientRect()
+
+    // Calculate the hand position on Asen's image
+    // asenHandPoint is a ratio (0-1) representing position on the image
+    const handX = asenRect.left - containerRect.left + asenRect.width * ASEN_HAND_POINT.x
+    const handY = asenRect.top - containerRect.top + asenRect.height * ASEN_HAND_POINT.y
+
+    // Convert to container percentages
+    const computedStart = {
+      x: (handX / containerRect.width) * 100,
+      y: (handY / containerRect.height) * 100,
+    }
+
+    setRopeStart(computedStart)
+  }, [containerSize.width, containerSize.height, pullCount])
+
   const ropePoints = (() => {
     if (!containerSize.width || !containerSize.height) {
       return []
@@ -59,9 +91,7 @@ function GamePage() {
 
   const desiredRopeThickness = 12
   const ropeStrokeWidth = desiredRopeThickness
-  const ropePatternScale = ropeImage && ropeImage.height
-    ? desiredRopeThickness / ropeImage.height
-    : 0.25
+  const ropePatternScale = ropeImage && ropeImage.height ? desiredRopeThickness / ropeImage.height : 0.25
 
   const handlePull = () => {
     if (pullCount >= TOTAL_PULLS) return
@@ -71,7 +101,7 @@ function GamePage() {
 
     const newRopeEnd = {
       x: INITIAL_ROPE_END.x + (FINAL_ROPE_END.x - INITIAL_ROPE_END.x) * progress,
-      y: INITIAL_ROPE_END.y + (FINAL_ROPE_END.y - INITIAL_ROPE_END.y) * progress
+      y: INITIAL_ROPE_END.y + (FINAL_ROPE_END.y - INITIAL_ROPE_END.y) * progress,
     }
 
     const newPeevskiHeight =
@@ -98,12 +128,11 @@ function GamePage() {
       percentY: percentY.toFixed(2)
     })
     
-    // If rope edit mode is active, set coordinates on click
+    // If rope edit mode is active, only set end point on click (not start point)
+    // Start point is always calculated from Asen's hand position
     if (ropeEditMode) {
-      const target = e.target.closest('.rope-handle-start, .rope-handle-end')
-      if (target?.classList.contains('rope-handle-start')) {
-        setRopeStart({ x: parseFloat(percentX.toFixed(2)), y: parseFloat(percentY.toFixed(2)) })
-      } else if (target?.classList.contains('rope-handle-end')) {
+      const target = e.target.closest('.rope-handle-end')
+      if (target?.classList.contains('rope-handle-end')) {
         setRopeEnd({ x: parseFloat(percentX.toFixed(2)), y: parseFloat(percentY.toFixed(2)) })
       }
     }
@@ -155,22 +184,22 @@ function GamePage() {
           <div className="mt-4 pt-4 border-t border-white/20">
             <div className="font-bold mb-2">Rope Position Editor</div>
             <div className="mb-2">
-              <label className="block text-xs mb-1">Start Point (Asen's hands)</label>
+              <label className="block text-xs mb-1">Start Point (Asen's hands) - Auto-calculated</label>
               <div className="flex gap-2">
                 <input
                   type="number"
                   step="0.01"
-                  value={ropeStart.x}
-                  onChange={(e) => setRopeStart({ ...ropeStart, x: parseFloat(e.target.value) || 0 })}
-                  className="w-20 px-1 py-0.5 text-black rounded text-xs"
+                  value={ropeStart.x.toFixed(2)}
+                  disabled
+                  className="w-20 px-1 py-0.5 text-black rounded text-xs bg-gray-200 cursor-not-allowed"
                   placeholder="X %"
                 />
                 <input
                   type="number"
                   step="0.01"
-                  value={ropeStart.y}
-                  onChange={(e) => setRopeStart({ ...ropeStart, y: parseFloat(e.target.value) || 0 })}
-                  className="w-20 px-1 py-0.5 text-black rounded text-xs"
+                  value={ropeStart.y.toFixed(2)}
+                  disabled
+                  className="w-20 px-1 py-0.5 text-black rounded text-xs bg-gray-200 cursor-not-allowed"
                   placeholder="Y %"
                 />
               </div>
@@ -223,9 +252,17 @@ function GamePage() {
       {ropeEditMode && debugMode && (
         <>
           <div
-            className="absolute w-4 h-4 bg-green-500 border-2 border-white rounded-full cursor-pointer z-50 rope-handle-start"
+            ref={asenRef}
+            src={asen}
+            alt="Asen"
+            className="absolute w-16 h-16 asen-character"
             style={{ left: `${ropeStart.x}%`, top: `${ropeStart.y}%`, transform: 'translate(-50%, -50%)' }}
             onClick={(e) => e.stopPropagation()}
+          />
+          <div
+            className="absolute w-4 h-4 bg-green-500 border-2 border-white rounded-full z-50 rope-handle-start pointer-events-none"
+            style={{ left: `${ropeStart.x}%`, top: `${ropeStart.y}%`, transform: 'translate(-50%, -50%)' }}
+            title="Rope start (fixed to Asen's hand - not editable)"
           />
           <div
             className="absolute w-4 h-4 bg-red-500 border-2 border-white rounded-full cursor-pointer z-50 rope-handle-end"
@@ -236,7 +273,7 @@ function GamePage() {
       )}
 
       {/* Asen at bottom left */}
-      <img src={asen} alt="Asen" className="asen-character" />
+      <img src={asen} alt="Asen" className="asen-character" ref={asenRef} />
 
       {/* Rope connecting asen to peevski using Konva */}
       {containerSize.width > 0 && containerSize.height > 0 && ropePoints.length === 4 && (
@@ -274,7 +311,6 @@ function GamePage() {
           top: `${ropeEnd.y}%`,
           transform: 'translate(-50%, -100%)',
           height: `${peevskiHeight}px`,
-          width: 'auto',
         }}
       />
 
