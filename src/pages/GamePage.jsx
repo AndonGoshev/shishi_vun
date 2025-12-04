@@ -8,6 +8,11 @@ import rope from '../assets/images/rope-texture.png'
 import pullSound1Url from '../assets/audio/pull1.wav'
 import pullSound2Url from '../assets/audio/pull2.wav'
 import pullSound3Url from '../assets/audio/pull3.wav'
+import pullVideo20Url from '../assets/video/pull-20.mp4'
+import pullVideo40Url from '../assets/video/pull-40.mp4'
+import pullVideo60Url from '../assets/video/pull-60.mp4'
+import pullVideo80Url from '../assets/video/pull-80.mp4'
+import pullVideo100Url from '../assets/video/pull-100.mp4'
 import './GamePage.css'
 
 const TOTAL_PULLS = 100
@@ -25,6 +30,7 @@ const ASEN_SHAKE_STRENGTH = 5
 const ROPE_SHAKE_STRENGTH = 3
 const PEEVSKI_SHAKE_STRENGTH = 2
 const LOADER_MIN_DURATION = 2000
+const PULL_TO_REFRESH_THRESHOLD = 80
 
 function GamePage() {
   const [clickPosition, setClickPosition] = useState(null)
@@ -50,6 +56,13 @@ function GamePage() {
   const pullSound1Ref = useRef(null)
   const pullSound2Ref = useRef(null)
   const pullSound3Ref = useRef(null)
+  const pullStartYRef = useRef(null)
+  const pullTriggeredRef = useRef(false)
+  const pullVideoRef = useRef(null)
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false)
+  const [showPullVideo, setShowPullVideo] = useState(false)
+  const [pullVideoVisible, setPullVideoVisible] = useState(false)
+  const [currentPullVideoUrl, setCurrentPullVideoUrl] = useState(null)
 
   useEffect(() => {
     const updateSize = () => {
@@ -94,6 +107,10 @@ function GamePage() {
       pullSound2Ref.current = null
       pullAudio3.pause()
       pullSound3Ref.current = null
+      if (pullVideoRef.current) {
+        pullVideoRef.current.pause()
+        pullVideoRef.current.currentTime = 0
+      }
     }
   }, [])
 
@@ -315,7 +332,44 @@ function GamePage() {
     }, SHAKE_DURATION)
   }
 
+  const playPullHighlightVideo = (videoUrl) => {
+    if (!videoUrl) return
+    setCurrentPullVideoUrl(videoUrl)
+    setShowPullVideo(true)
+    setIsVideoPlaying(true)
+    requestAnimationFrame(() => {
+      setPullVideoVisible(true)
+      setTimeout(() => {
+        const video = pullVideoRef.current
+        if (video) {
+          video.currentTime = 0
+          const playPromise = video.play()
+          if (playPromise !== undefined) {
+            playPromise.catch((err) => {
+              console.warn('Pull video playback blocked', err)
+              handlePullVideoEnded()
+            })
+          }
+        }
+      }, 60)
+    })
+  }
+
+  const handlePullVideoEnded = () => {
+    setIsVideoPlaying(false)
+    setPullVideoVisible(false)
+    setTimeout(() => {
+      if (pullVideoRef.current) {
+        pullVideoRef.current.pause()
+        pullVideoRef.current.currentTime = 0
+      }
+      setShowPullVideo(false)
+      setCurrentPullVideoUrl(null)
+    }, 300)
+  }
+
   const handlePull = () => {
+    if (isVideoPlaying) return
     if (pullCount >= TOTAL_PULLS) return
 
     const nextCount = pullCount + 1
@@ -349,6 +403,20 @@ function GamePage() {
         console.warn('Pull sound blocked', err)
       })
     }
+
+    let highlightVideoUrl = null
+    if (isHundredthPull || isTwentiethPull) {
+      if (nextCount === 100) highlightVideoUrl = pullVideo100Url
+      else if (nextCount === 80) highlightVideoUrl = pullVideo80Url
+      else if (nextCount === 60) highlightVideoUrl = pullVideo60Url
+      else if (nextCount === 40) highlightVideoUrl = pullVideo40Url
+      else highlightVideoUrl = pullVideo20Url
+    }
+
+    if (highlightVideoUrl) {
+      playPullHighlightVideo(highlightVideoUrl)
+    }
+
     triggerShake()
   }
 
@@ -583,11 +651,31 @@ function GamePage() {
 
           <button
             onClick={handlePull}
-            disabled={pullCount >= TOTAL_PULLS}
+            disabled={pullCount >= TOTAL_PULLS || isVideoPlaying}
             className="absolute bottom-5 left-1/2 -translate-x-1/2 px-6 py-3 text-[1.1rem] bg-white text-[#8B0000] border-none rounded-full cursor-pointer font-bold whitespace-nowrap shadow-lg transition-all hover:bg-gray-100 hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 active:shadow-md z-[100] disabled:opacity-60 disabled:cursor-not-allowed"
           >
             Дърпай Асене!
           </button>
+
+          {showPullVideo && currentPullVideoUrl && (
+            <div className="absolute inset-0 z-[200] flex justify-end pointer-events-none">
+              <div
+                className={`mt-6 h-[45%] w-[70%] max-w-[320px] bg-black/90 text-white shadow-2xl pointer-events-auto transform transition-transform duration-300 rounded-lg overflow-hidden ${pullVideoVisible ? 'translate-x-[-10px]' : 'translate-x-full'}`}
+              >
+                <video
+                  key={currentPullVideoUrl}
+                  ref={pullVideoRef}
+                  src={currentPullVideoUrl}
+                  className="w-full h-full object-cover"
+                  playsInline
+                  preload="auto"
+                  onEnded={handlePullVideoEnded}
+                  controls={false}
+                />
+              </div>
+            </div>
+          )}
+
         </>
       )}
     </div>
