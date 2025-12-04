@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import parliamentBg from '../assets/images/parliament-bg.png'
 import asen from '../assets/images/asen.png'
 import peevski from '../assets/images/peevski.png'
@@ -8,6 +8,56 @@ import './GamePage.css'
 function GamePage() {
   const [clickPosition, setClickPosition] = useState(null)
   const [debugMode, setDebugMode] = useState(true)
+  const containerRef = useRef(null)
+  const [ropeStyle, setRopeStyle] = useState({})
+  const [ropeStart, setRopeStart] = useState({ x: 35.17, y: 75.07 })
+  const [ropeEnd, setRopeEnd] = useState({ x: 48.49, y: 55.00 })
+  const [ropeEditMode, setRopeEditMode] = useState(true)
+
+  // Calculate rope position, angle, and length
+  useEffect(() => {
+    const calculateRope = () => {
+      if (!containerRef.current) return
+
+      const container = containerRef.current
+      const containerWidth = container.offsetWidth
+      const containerHeight = container.offsetHeight
+
+      // Start point
+      const startX = (ropeStart.x / 100) * containerWidth
+      const startY = (ropeStart.y / 100) * containerHeight
+
+      // End point
+      const endX = (ropeEnd.x / 100) * containerWidth
+      const endY = (ropeEnd.y / 100) * containerHeight
+
+      // Calculate distance
+      const deltaX = endX - startX
+      const deltaY = endY - startY
+      const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY)
+
+      // Calculate angle in degrees
+      const angle = Math.atan2(deltaY, deltaX) * (180 / Math.PI)
+
+      setRopeStyle({
+        left: `${ropeStart.x}%`,
+        top: `${ropeStart.y}%`,
+        transform: `translate(-50%, -50%) rotate(${angle}deg)`,
+        width: `${distance}px`,
+        height: '40px', // Increased height for visibility
+        backgroundImage: `url(${rope})`,
+        backgroundRepeat: 'repeat-x',
+        backgroundSize: 'auto 100%',
+        backgroundPosition: 'center',
+        transformOrigin: 'left center',
+      })
+    }
+
+    calculateRope()
+    window.addEventListener('resize', calculateRope)
+    
+    return () => window.removeEventListener('resize', calculateRope)
+  }, [ropeStart, ropeEnd])
 
   const handleContainerClick = (e) => {
     if (!debugMode) return
@@ -24,6 +74,16 @@ function GamePage() {
       percentX: percentX.toFixed(2),
       percentY: percentY.toFixed(2)
     })
+    
+    // If rope edit mode is active, set coordinates on click
+    if (ropeEditMode) {
+      const target = e.target.closest('.rope-handle-start, .rope-handle-end')
+      if (target?.classList.contains('rope-handle-start')) {
+        setRopeStart({ x: parseFloat(percentX.toFixed(2)), y: parseFloat(percentY.toFixed(2)) })
+      } else if (target?.classList.contains('rope-handle-end')) {
+        setRopeEnd({ x: parseFloat(percentX.toFixed(2)), y: parseFloat(percentY.toFixed(2)) })
+      }
+    }
     
     console.log(`Position: ${percentX}% ${percentY}% (${x}px, ${y}px)`)
   }
@@ -43,13 +103,14 @@ function GamePage() {
 
   return (
     <div 
+      ref={containerRef}
       className="w-full h-full bg-cover bg-center bg-no-repeat relative game-page-container"
       style={{ backgroundImage: `url(${parliamentBg})` }}
       onClick={handleContainerClick}
     >
       {/* Debug overlay */}
       {debugMode && (
-        <div className="absolute top-4 left-4 bg-black/80 text-white p-4 rounded-lg text-xs z-50">
+        <div className="absolute top-4 left-4 bg-black/80 text-white p-4 rounded-lg text-xs z-50 max-h-[80vh] overflow-y-auto">
           <div className="mb-2 font-bold">Debug Mode - Click to get coordinates</div>
           {clickPosition && (
             <div>
@@ -66,6 +127,63 @@ function GamePage() {
               </button>
             </div>
           )}
+          
+          {/* Rope Position Editor */}
+          <div className="mt-4 pt-4 border-t border-white/20">
+            <div className="font-bold mb-2">Rope Position Editor</div>
+            <div className="mb-2">
+              <label className="block text-xs mb-1">Start Point (Asen's hands)</label>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  step="0.01"
+                  value={ropeStart.x}
+                  onChange={(e) => setRopeStart({ ...ropeStart, x: parseFloat(e.target.value) || 0 })}
+                  className="w-20 px-1 py-0.5 text-black rounded text-xs"
+                  placeholder="X %"
+                />
+                <input
+                  type="number"
+                  step="0.01"
+                  value={ropeStart.y}
+                  onChange={(e) => setRopeStart({ ...ropeStart, y: parseFloat(e.target.value) || 0 })}
+                  className="w-20 px-1 py-0.5 text-black rounded text-xs"
+                  placeholder="Y %"
+                />
+              </div>
+            </div>
+            <div className="mb-2">
+              <label className="block text-xs mb-1">End Point (Peevski)</label>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  step="0.01"
+                  value={ropeEnd.x}
+                  onChange={(e) => setRopeEnd({ ...ropeEnd, x: parseFloat(e.target.value) || 0 })}
+                  className="w-20 px-1 py-0.5 text-black rounded text-xs"
+                  placeholder="X %"
+                />
+                <input
+                  type="number"
+                  step="0.01"
+                  value={ropeEnd.y}
+                  onChange={(e) => setRopeEnd({ ...ropeEnd, y: parseFloat(e.target.value) || 0 })}
+                  className="w-20 px-1 py-0.5 text-black rounded text-xs"
+                  placeholder="Y %"
+                />
+              </div>
+            </div>
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                setRopeEditMode(!ropeEditMode)
+              }}
+              className={`mt-2 px-2 py-1 rounded text-white text-xs ${ropeEditMode ? 'bg-green-600' : 'bg-gray-600'}`}
+            >
+              {ropeEditMode ? '✓ Click to Set' : 'Click Mode Off'}
+            </button>
+          </div>
+          
           <button 
             onClick={(e) => {
               e.stopPropagation()
@@ -78,6 +196,22 @@ function GamePage() {
         </div>
       )}
 
+      {/* Rope handles for visual editing */}
+      {ropeEditMode && debugMode && (
+        <>
+          <div
+            className="absolute w-4 h-4 bg-green-500 border-2 border-white rounded-full cursor-pointer z-50 rope-handle-start"
+            style={{ left: `${ropeStart.x}%`, top: `${ropeStart.y}%`, transform: 'translate(-50%, -50%)' }}
+            onClick={(e) => e.stopPropagation()}
+          />
+          <div
+            className="absolute w-4 h-4 bg-red-500 border-2 border-white rounded-full cursor-pointer z-50 rope-handle-end"
+            style={{ left: `${ropeEnd.x}%`, top: `${ropeEnd.y}%`, transform: 'translate(-50%, -50%)' }}
+            onClick={(e) => e.stopPropagation()}
+          />
+        </>
+      )}
+
       {/* Asen at bottom left */}
       <img 
         src={asen} 
@@ -86,10 +220,9 @@ function GamePage() {
       />
       
       {/* Rope connecting asen to peevski */}
-      <img 
-        src={rope} 
-        alt="Rope" 
+      <div 
         className="absolute rope-element"
+        style={ropeStyle}
       />
       
       {/* Peevski at parliament doors */}
