@@ -9,10 +9,10 @@ import './GamePage.css'
 
 const TOTAL_PULLS = 100
 const INITIAL_ROPE_START = { x: 35.17, y: 75.07 }
-const INITIAL_ROPE_END = { x: 48.49, y: 55.0 }
-const FINAL_ROPE_END = { x: 71.09, y: 76.94 }
-const INITIAL_PEEVSKI_HEIGHT = 30
-const FINAL_PEEVSKI_HEIGHT = 220
+const INITIAL_ROPE_END = { x: 49.49, y: 56.0 }
+const FINAL_ROPE_END = { x: 65.09, y: 67.94 }
+const INITIAL_PEEVSKI_HEIGHT = 20
+const FINAL_PEEVSKI_HEIGHT = 320
 // Fixed point on Asen's image where the rope starts (as percentage of image dimensions)
 // These represent where Asen's hand is on his image (0-1 range, where 0.5 = center)
 // Detected: 81.5% from left, 50.6% from top of Asen's image
@@ -89,7 +89,7 @@ function GamePage() {
     return [startX, startY, endX, endY]
   })()
 
-  const desiredRopeThickness = 12
+  const desiredRopeThickness = 4
   const ropeStrokeWidth = desiredRopeThickness
   const ropePatternScale = ropeImage && ropeImage.height ? desiredRopeThickness / ropeImage.height : 0.25
 
@@ -281,7 +281,7 @@ function GamePage() {
           width={containerSize.width}
           height={containerSize.height}
           className="absolute top-0 left-0 pointer-events-none"
-          style={{ zIndex: 6 }}
+          style={{ zIndex: 20 }}
           listening={false}
         >
           <Layer>
@@ -309,7 +309,7 @@ function GamePage() {
         style={{
           left: `${ropeEnd.x}%`,
           top: `${ropeEnd.y}%`,
-          transform: 'translate(-50%, -100%)',
+          transform: 'translate(-15%, -53%)',
           height: `${peevskiHeight}px`,
         }}
       />
