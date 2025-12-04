@@ -1,21 +1,32 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Stage, Layer, Line, Image as KonvaImage } from 'react-konva'
 import useImage from 'use-image'
 import parliamentBg from '../assets/images/parliament-bg.png'
 import asen from '../assets/images/asen.png'
 import peevski from '../assets/images/peevski.png'
 import rope from '../assets/images/rope-texture.png'
+import protest1 from '../assets/images/protest2.png'
+import protest2 from '../assets/images/protest1.png'
 import pullSound1Url from '../assets/audio/pull1.wav'
 import pullSound2Url from '../assets/audio/pull2.wav'
 import pullSound3Url from '../assets/audio/pull3.wav'
-import pullVideo20Url from '../assets/video/pull-20.mp4'
-import pullVideo40Url from '../assets/video/pull-40.mp4'
-import pullVideo60Url from '../assets/video/pull-60.mp4'
-import pullVideo80Url from '../assets/video/pull-80.mp4'
-import pullVideo100Url from '../assets/video/pull-100.mp4'
+import pullVideoStage1Url from '../assets/video/pull-special1.mp4'
+import pullVideoStage2Url from '../assets/video/pull-special2.mp4'
+import pullVideoStage3Url from '../assets/video/pull-special3.mp4'
+import pullVideoStage4Url from '../assets/video/pull-special4.mp4'
+import pullVideoStage5Url from '../assets/video/pull-special5.mp4'
 import './GamePage.css'
 
-const TOTAL_PULLS = 100
+const TOTAL_PULLS = 50
+const HIGHLIGHT_VIDEOS = {
+  10: pullVideoStage1Url,
+  20: pullVideoStage2Url,
+  30: pullVideoStage3Url,
+  40: pullVideoStage4Url,
+  50: pullVideoStage5Url,
+}
+const PEEVSKI_CLICK_OPACITY = [0, 0.33, 0.66, 0.66, 1]
 const INITIAL_ROPE_START = { x: 35.17, y: 98.07 }
 const INITIAL_ROPE_END = { x: 49.49, y: 56.0 }
 const FINAL_ROPE_END = { x: 65.09, y: 67.94 }
@@ -33,6 +44,7 @@ const LOADER_MIN_DURATION = 2000
 const PULL_TO_REFRESH_THRESHOLD = 80
 
 function GamePage() {
+  const navigate = useNavigate()
   const [clickPosition, setClickPosition] = useState(null)
   const [debugMode, setDebugMode] = useState(true)
   const containerRef = useRef(null)
@@ -63,6 +75,13 @@ function GamePage() {
   const [showPullVideo, setShowPullVideo] = useState(false)
   const [pullVideoVisible, setPullVideoVisible] = useState(false)
   const [currentPullVideoUrl, setCurrentPullVideoUrl] = useState(null)
+  const [gameCompleted, setGameCompleted] = useState(false)
+  const [showVictoryModal, setShowVictoryModal] = useState(false)
+
+  const peevskiOpacity = useMemo(() => {
+    const index = Math.min(pullCount, PEEVSKI_CLICK_OPACITY.length - 1)
+    return PEEVSKI_CLICK_OPACITY[index]
+  }, [pullCount])
 
   useEffect(() => {
     const updateSize = () => {
@@ -365,6 +384,10 @@ function GamePage() {
       }
       setShowPullVideo(false)
       setCurrentPullVideoUrl(null)
+      if (pullCount >= TOTAL_PULLS) {
+        setGameCompleted(true)
+        setShowVictoryModal(true)
+      }
     }, 300)
   }
 
@@ -386,12 +409,14 @@ function GamePage() {
     setPullCount(nextCount)
     setRopeEnd(newRopeEnd)
     setPeevskiHeight(newPeevskiHeight)
-    const isTwentiethPull = nextCount % 20 === 0
-    const isHundredthPull = nextCount === TOTAL_PULLS
+    const isFinalPull = nextCount === TOTAL_PULLS
+    const isTenthPull = nextCount % 10 === 0
     const isFifthPull = nextCount % 5 === 0
 
     let pullAudio = pullSound1Ref.current
-    if (isHundredthPull || isTwentiethPull) {
+    if (isFinalPull) {
+      pullAudio = pullSound3Ref.current
+    } else if (isTenthPull) {
       pullAudio = pullSound3Ref.current
     } else if (isFifthPull) {
       pullAudio = pullSound2Ref.current
@@ -404,20 +429,38 @@ function GamePage() {
       })
     }
 
-    let highlightVideoUrl = null
-    if (isHundredthPull || isTwentiethPull) {
-      if (nextCount === 100) highlightVideoUrl = pullVideo100Url
-      else if (nextCount === 80) highlightVideoUrl = pullVideo80Url
-      else if (nextCount === 60) highlightVideoUrl = pullVideo60Url
-      else if (nextCount === 40) highlightVideoUrl = pullVideo40Url
-      else highlightVideoUrl = pullVideo20Url
-    }
+    const highlightVideoUrl = HIGHLIGHT_VIDEOS[nextCount] || null
 
     if (highlightVideoUrl) {
       playPullHighlightVideo(highlightVideoUrl)
     }
 
     triggerShake()
+  }
+
+  const resetGame = () => {
+    if (pullVideoRef.current) {
+      pullVideoRef.current.pause()
+      pullVideoRef.current.currentTime = 0
+    }
+    if (shakeTimeoutRef.current) {
+      clearTimeout(shakeTimeoutRef.current)
+      shakeTimeoutRef.current = null
+    }
+    setPullCount(0)
+    setRopeEnd(INITIAL_ROPE_END)
+    setPeevskiHeight(INITIAL_PEEVSKI_HEIGHT)
+    setIsVideoPlaying(false)
+    setShowPullVideo(false)
+    setPullVideoVisible(false)
+    setCurrentPullVideoUrl(null)
+    setGameCompleted(false)
+    setShowVictoryModal(false)
+    setShakeOffsets({
+      asen: { x: 0, y: 0 },
+      peevski: { x: 0, y: 0 },
+      rope: { x: 0, y: 0 },
+    })
   }
 
   const handleContainerClick = (e) => {
@@ -468,6 +511,25 @@ function GamePage() {
       style={{ backgroundImage: `url(${parliamentBg})` }}
       onClick={handleContainerClick}
     >
+      <button
+        type="button"
+        onClick={() => navigate('/')}
+        aria-label="Назад"
+        className="absolute top-4 left-4 z-[120] flex h-10 w-10 items-center justify-center rounded-full bg-white/30 text-[#8B0000] shadow-lg transition-transform hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 focus:outline-none"
+      >
+        <svg
+          className="h-5 w-5"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M15 18l-6-6 6-6" />
+        </svg>
+      </button>
       {showLoaderOverlay && (
         <div
           className={`absolute inset-0 flex items-center justify-center bg-black/60 text-white text-lg font-semibold z-50 transition-opacity duration-500 ${assetsLoaded ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
@@ -599,6 +661,18 @@ function GamePage() {
             }}
           />
 
+          <img
+            src={protest1}
+            alt="Protest crowd left"
+            className="protest-image protest-left"
+          />
+
+          <img
+            src={protest2}
+            alt="Protest crowd right"
+            className="protest-image protest-right"
+          />
+
           {/* Rope connecting asen to peevski using Konva */}
           {containerSize.width > 0 && containerSize.height > 0 && ropePoints.length === 4 && (
             <Stage
@@ -646,15 +720,16 @@ function GamePage() {
               top: `${ropeEnd.y}%`,
               transform: `translate(-15%, -53%) translate(${shakeOffsets.peevski.x}px, ${shakeOffsets.peevski.y}px)`,
               height: `${peevskiHeight}px`,
+              opacity: peevskiOpacity,
             }}
           />
 
           <button
-            onClick={handlePull}
-            disabled={pullCount >= TOTAL_PULLS || isVideoPlaying}
+            onClick={gameCompleted ? resetGame : handlePull}
+            disabled={(!gameCompleted && pullCount >= TOTAL_PULLS) || isVideoPlaying}
             className="absolute bottom-5 left-1/2 -translate-x-1/2 px-6 py-3 text-[1.1rem] bg-white text-[#8B0000] border-none rounded-full cursor-pointer font-bold whitespace-nowrap shadow-lg transition-all hover:bg-gray-100 hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 active:shadow-md z-[100] disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            Дърпай Асене!
+            {gameCompleted ? 'Започни от начало' : 'Дърпай Асене!'}
           </button>
 
           {showPullVideo && currentPullVideoUrl && (
@@ -672,6 +747,22 @@ function GamePage() {
                   onEnded={handlePullVideoEnded}
                   controls={false}
                 />
+              </div>
+            </div>
+          )}
+
+          {showVictoryModal && (
+            <div className="absolute inset-0 z-[250] flex items-center justify-center bg-black/70">
+              <div className="mx-4 max-w-sm rounded-xl bg-white px-6 py-8 text-center shadow-2xl">
+                <p className="text-lg font-semibold text-[#8B0000]">
+                  Честито! Вие успешно изгонихте Пеевски от парламента
+                </p>
+                <button
+                  onClick={() => setShowVictoryModal(false)}
+                  className="mt-6 inline-flex items-center justify-center rounded-full bg-[#8B0000] px-5 py-2 text-base font-semibold text-white transition-colors hover:bg-[#a50000]"
+                >
+                  Затвори
+                </button>
               </div>
             </div>
           )}

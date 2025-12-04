@@ -2,6 +2,15 @@
 
 /* Game page container styles */
 
+@keyframes protest-bounce {
+  0%, 100% {
+    transform: translate(-50%, -50%) translateY(0);
+  }
+  50% {
+    transform: translate(-50%, -50%) translateY(-2px);
+  }
+}
+
 .asen-character {
   position: absolute;
   bottom: 0;
@@ -14,5 +23,28 @@
 .peevski-character {
   position: absolute;
   z-index: 8;
+}
+
+.protest-image {
+  position: absolute;
+  top: 55%;
+  transform: translate(-50%, -50%);
+  width: clamp(150px, 22vw, 260px);
+  pointer-events: none;
+  z-index: 7;
+  animation: protest-bounce 1.8s ease-in-out infinite;
+}
+
+.protest-left {
+  top: 56%;
+  left: 10%;
+  animation-duration: 1.6s;
+  animation-delay: 0s;
+}
+
+.protest-right {
+  left: 88%;
+  animation-duration: 2.1s;
+  animation-delay: -0.8s;
 }
 

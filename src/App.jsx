@@ -11,7 +11,7 @@ function App() {
     const audio = new Audio(backgroundMusicUrl)
     audio.loop = true
     audio.preload = 'auto'
-    audio.volume = 0.03
+    audio.volume = 0.3
     audioRef.current = audio
 
     return () => {
