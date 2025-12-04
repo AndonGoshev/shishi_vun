@@ -515,7 +515,7 @@ function GamePage() {
         type="button"
         onClick={() => navigate('/')}
         aria-label="Назад"
-        className="absolute top-4 left-4 z-[120] flex h-10 w-10 items-center justify-center rounded-full bg-white/30 text-[#8B0000] shadow-lg transition-transform hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 focus:outline-none"
+        className="absolute top-16 left-4 z-[120] flex h-10 w-10 items-center justify-center rounded-full bg-white/30 text-[#8B0000] shadow-lg transition-transform hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 focus:outline-none"
       >
         <svg
           className="h-5 w-5"
